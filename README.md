@@ -1,55 +1,120 @@
 # Tesla Stock Price vs Revenue Analysis
+# Goal: compare Tesla's share price with its quarterly revenue.
+# Tip: each chart opens in a window. Close the window to continue the program.
 
-Comparing Tesla's share price with its quarterly revenue, using data from Yahoo Finance and a web page, in Python.
+import os
+import pandas as pd
+import requests
+import yfinance as yf
+import matplotlib.pyplot as plt
+import seaborn as sns
+from bs4 import BeautifulSoup
 
-## About
+# Folder to save the charts (used later in the README)
+os.makedirs("images", exist_ok=True)
 
-- **Goal:** See how Tesla's share price moved compared with its revenue over time.
-- **Data:** Share price from Yahoo Finance (`yfinance`) and quarterly revenue scraped from an IBM Data Analyst Professional Certificate lab page.
-- **Tools:** Python, pandas, yfinance, BeautifulSoup, Matplotlib, Seaborn
+# ---------------------------------------------------------
+# Step 1: Get Tesla share price data (from Yahoo Finance)
+# ---------------------------------------------------------
+tesla = yf.Ticker("TSLA")
+stock = tesla.history(period="max")
+stock = stock.reset_index()
 
-## What I Did
+# Remove the time zone so dates are easy to compare
+stock["Date"] = pd.to_datetime(stock["Date"]).dt.tz_localize(None)
 
-1. Downloaded Tesla's full share price history with `yfinance`.
-2. Scraped Tesla's quarterly revenue table from a web page using `requests` and `BeautifulSoup`.
-3. Cleaned the revenue data: removed `$` and `,` signs and converted dates and revenue to the right types.
-4. Cut both datasets to the same time period (the revenue data ends in 2021).
-5. Compared price and revenue quarter by quarter, using the average share price of each quarter.
+print("Share price data:")
+print(stock[["Date", "Open", "Close", "Volume"]].head())
 
-## Charts
+# ---------------------------------------------------------
+# Step 2: Get Tesla revenue data (scraped from a web page)
+# ---------------------------------------------------------
+url = (
+    "https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/"
+    "IBMDeveloperSkillsNetwork-PY0220EN-SkillsNetwork/labs/project/revenue.htm"
+)
+html_data = requests.get(url).text
+soup = BeautifulSoup(html_data, "html.parser")
 
-**1. Share Price and Revenue Over Time**
-Revenue grew steadily while the share price rose sharply in 2020.
+# Find the table and read the date and revenue from each row
+table = soup.find("table")
+rows = []
+for row in table.find_all("tr"):
+    cells = row.find_all("td")
+    if len(cells) >= 2:
+        date = cells[0].text.strip()
+        revenue_text = cells[1].text.strip()
+        rows.append({"Date": date, "Revenue": revenue_text})
 
-![Tesla Share Price and Revenue](images/tesla_price_vs_revenue.png)
+revenue = pd.DataFrame(rows)
 
-**2. Revenue vs Average Share Price**
-Each dot is one quarter. Quarters with higher revenue also had higher average prices.
+# ---------------------------------------------------------
+# Step 3: Clean the revenue data
+# ---------------------------------------------------------
+# Remove "$" and "," so revenue becomes a number
+revenue["Revenue"] = revenue["Revenue"].str.replace(r"[,$]", "", regex=True)
 
-![Revenue vs Average Share Price](images/tesla_revenue_vs_price.png)
+# Remove empty rows
+revenue = revenue[revenue["Revenue"] != ""]
 
-## Results
+# Change the data types
+revenue["Revenue"] = revenue["Revenue"].astype(float)
+revenue["Date"] = pd.to_datetime(revenue["Date"])
 
-- **Quarters compared:** [number printed by the script]
-- **Correlation between average price and revenue:** [value printed by the script]
+print("\nRevenue data (last 5 rows):")
+print(revenue.tail())
 
-A value close to 1 means price and revenue rose together. It does not prove that one caused the other.
+# ---------------------------------------------------------
+# Step 4: Keep the same time period in both datasets
+# The revenue data ends in 2021, so we cut the share price data there too.
+# ---------------------------------------------------------
+stock = stock[stock["Date"] <= "2021-06-14"]
+revenue = revenue[revenue["Date"] <= "2021-04-30"]
 
-## Limitations
+# ---------------------------------------------------------
+# Step 5: Chart 1 - share price (top) and revenue (bottom)
+# ---------------------------------------------------------
+fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
 
-- The revenue data ends in 2021, so the analysis stops there.
-- Share price depends on many things besides revenue, such as news and market mood.
-- Correlation shows that two things move together, not that one causes the other.
+axes[0].plot(stock["Date"], stock["Close"], color="blue")
+axes[0].set_ylabel("Price (US$)")
+axes[0].set_title("Tesla - Historical Share Price")
 
-## How to Run
+axes[1].plot(revenue["Date"], revenue["Revenue"], color="green")
+axes[1].set_ylabel("Revenue (US$ Millions)")
+axes[1].set_xlabel("Date")
+axes[1].set_title("Tesla - Historical Revenue")
 
-```bash
-pip install -r requirements.txt
-python tesla_stock_vs_revenue_analysis.py
-```
+plt.tight_layout()
+plt.savefig("images/tesla_price_vs_revenue.png", dpi=150)
+plt.show()
 
-Charts are saved in the `images/` folder. The share price data is downloaded live, so it needs an internet connection.
+# ---------------------------------------------------------
+# Step 6: Compare price and revenue quarter by quarter
+# Revenue is reported every quarter, but price changes every day.
+# So we take the average price of each quarter to compare them fairly.
+# ---------------------------------------------------------
+stock["Quarter"] = stock["Date"].dt.to_period("Q")
+revenue["Quarter"] = revenue["Date"].dt.to_period("Q")
 
-## Credits
+average_price = stock.groupby("Quarter")["Close"].mean()
+quarterly_revenue = revenue.groupby("Quarter")["Revenue"].last()
 
-Based on a lab from the **IBM Data Analyst Professional Certificate** on Coursera. I added the quarter-by-quarter comparison, the correlation and saved charts.
+# Keep only the quarters that exist in both
+combined = pd.concat([average_price, quarterly_revenue], axis=1, join="inner")
+combined.columns = ["Average Price", "Revenue"]
+
+correlation = combined["Average Price"].corr(combined["Revenue"])
+print("\nNumber of quarters compared:", len(combined))
+print("Correlation between average price and revenue:", round(correlation, 2))
+print("(Close to 1 = they rise together. It does not prove one causes the other.)")
+
+# ---------------------------------------------------------
+# Step 7: Chart 2 - average price vs revenue
+# ---------------------------------------------------------
+sns.regplot(x="Revenue", y="Average Price", data=combined)
+plt.xlabel("Quarterly Revenue (US$ Millions)")
+plt.ylabel("Average Share Price (US$)")
+plt.title("Tesla - Revenue vs Average Share Price (each dot = one quarter)")
+plt.savefig("images/tesla_revenue_vs_average.png", dpi=150)
+plt.show()
