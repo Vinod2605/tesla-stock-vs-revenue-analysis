@@ -19,12 +19,12 @@ Comparing Tesla's share price with its quarterly revenue, using data from Yahoo 
 ## Charts
 
 **1. Share Price and Revenue Over Time**
-[One sentence on what you see, e.g. revenue grew steadily while the share price rose sharply in 2020.]
+Revenue grew steadily while the share price rose sharply in 2020.
 
 ![Tesla Share Price and Revenue](images/tesla_price_vs_revenue.png)
 
 **2. Revenue vs Average Share Price**
-Each dot is one quarter. [One sentence on the pattern, e.g. quarters with higher revenue also had higher average prices.]
+Each dot is one quarter. Quarters with higher revenue also had higher average prices.
 
 ![Revenue vs Average Share Price](images/tesla_revenue_vs_price.png)
 
@@ -33,7 +33,7 @@ Each dot is one quarter. [One sentence on the pattern, e.g. quarters with higher
 - **Quarters compared:** [number printed by the script]
 - **Correlation between average price and revenue:** [value printed by the script]
 
-[One sentence explaining it. A value close to 1 means price and revenue rose together. It does not prove that one caused the other.]
+A value close to 1 means price and revenue rose together. It does not prove that one caused the other.
 
 ## Limitations
 
